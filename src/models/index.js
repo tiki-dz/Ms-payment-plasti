@@ -25,11 +25,7 @@ try {
 }
 
 const db = {}
-// dl=['Account','Administrator','Cinema','Client','Other','Partner','Stadium','Theatre','User']
-// var pa=require(path.join(__dirname, 'Account.js'))(sequelize, Sequelize.DataTypes)
-// db[pa.name]=pa
-// pa=require(path.join(__dirname, 'User.js'))(sequelize, Sequelize.DataTypes)
-// db[pa.name]=pa
+
 fs.readdirSync(__dirname)
   .filter((file) => file !== 'index.js')
   .forEach((file) => {
@@ -54,30 +50,3 @@ Object.keys(db).forEach(function (modelName) {
 db.sequelize = sequelize
 db.Sequelize = Sequelize
 module.exports = db
-
-//
-// const {Administrator} = require('../models/Administrator')
-// const {User} = require('../models/User')
-// const {Client} = require('../models/Client')
-// const {Cinema} = require('../models/Cinema')
-// const {Theatre} = require('../models/Theatre')
-// const {Partner} = require('../models/Partner')
-// const {Stadium} = require('../models/Stadium')
-// const {Account} = require('../models/Account')
-//  Admin.belongsTo(User)
-//  console.log('Associate admin!')
-
-//  Client.belongsTo(User)
-//  console.log('Client belongs to user!')
-
-//  Cinema.belongsTo(Partner)
-//  console.log('Cinema belongs to partner!')
-
-//  Partner.belongsTo(User, {foreignKey: 'idUser', as: 'User',constraints: false})
-
-//  Stadium.belongsTo(Partner)
-//  console.log('Stadium belongs to partner!')
-
-//  Theatre.belongsTo(Partner)
-//  console.log('Stadium belongs to partner!')
-// console.log('tables created')

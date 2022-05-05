@@ -15,25 +15,17 @@ const app = express()
 
 // view engine setup
 app.use(logger('dev'))
-app.use(
-  '/webhook',
-  express.json({
-    verify: (req, res, buf) => {
-      req.rawBody = buf.toString()
-    }
-  })
-)
+const bodyParser = require('body-parser')
+app.use('/api/payment/webhook', bodyParser.raw({ type: '*/*' }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser())
-const bodyParser = require('body-parser')
 app.use(bodyParser.urlencoded({ extended: true }))
 app.use('/api', indexRouter)
-// parse application/json
-app.use(bodyParser.json())
+
 app.listen(5003)
 // sequelize.query('SET FOREIGN_KEY_CHECKS = 0').then(function () {
-//   sequelize.sync()
+//   sequelize.sync({ alter: true })
 // })
 module.exports = app
 console.log('server start on port 5003')
