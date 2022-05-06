@@ -11,13 +11,11 @@ async function purchase (req, res) {
     console.log(req.body)
     const codePromo = req.body.codePromo
     if ('codePromo' in req.body) {
-      const today = new Date()
-      const date = today.getFullYear() + '-' + (today.getMonth() + 1) + '-' + today.getDate()
-      const time = today.getHours() + ':' + today.getMinutes() + ':' + today.getSeconds()
-      const dateTime = date + ' ' + time
-      const responseCP = await CodePromo.count({ where: { name: codePromo, endTime: { [Op.lte]: dateTime } } })
-      if (responseCP === 0) {
-        return res.status(500).send({ errors: 'codePromo not found', success: false, message: 'codePromo invalid' })
+      console.log(new Date())
+      const responseCP = await CodePromo.findOne({ where: { name: codePromo, endTime: { [Op.gte]: new Date() } } })
+
+      if (responseCP === null) {
+        return res.status(500).send({ errors: 'codePromo not invalid', success: false, message: 'codePromo not found or not valid' })
       }
       event.price = event.price * responseCP.value
       req.body.codePromo = responseCP.id
