@@ -1,11 +1,12 @@
 const express = require('express')
 const router = express.Router()
 const paymentController = require('../controllers/paymentController')
-router.post('/purchase', paymentController.purchase)
+const validation = require('../validation/validation')
+router.post('/purchase', validation.validate('purchase'), paymentController.purchase)
 router.post('/webhook', paymentController.webhook)
-router.post('/saveEvent', paymentController.saveEvent)
-router.post('/unsaveEvent', paymentController.unsaveEvent)
-router.get('/:id/purchases', paymentController.getPurchasesByClient)
+router.post('/saveEvent', validation.validate('saveEvent'), paymentController.saveEvent)
+router.post('/unsaveEvent', validation.validate('saveEvent'), paymentController.unsaveEvent)
+router.get('/:id/purchases', validation.validate('getPurchases'), paymentController.getPurchasesByClient)
 router.get('/purchases', paymentController.getAllPurchases)
 
 module.exports = router

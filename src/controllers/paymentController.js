@@ -3,8 +3,17 @@ const StripeSecretKey = process.env.STRIPE_SECRET_KEY
 const { SavedEvent, Purchase, MultipleTicket, CodePromo } = require('../models')
 const stripe = require('stripe')(StripeSecretKey)
 const { Op } = require('sequelize')
+const { validationResult } = require('express-validator')
 // open a session of payment and send the url
 async function purchase (req, res) {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    return res.status(422).json({
+      errors: errors.array(),
+      success: false,
+      message: 'invalid data'
+    })
+  }
   try {
     const data = req.body.data
     const event = req.body.event
@@ -97,6 +106,14 @@ async function webhook (req, res) {
   res.sendStatus(200)
 };
 async function saveEvent (req, res) {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    return res.status(422).json({
+      errors: errors.array(),
+      success: false,
+      message: 'invalid data'
+    })
+  }
   try {
     const idEvent = parseInt(req.body.idEvent)
     const idClient = parseInt(req.body.idClient)
@@ -121,6 +138,14 @@ async function saveEvent (req, res) {
   }
 }
 async function unsaveEvent (req, res) {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    return res.status(422).json({
+      errors: errors.array(),
+      success: false,
+      message: 'invalid data'
+    })
+  }
   try {
     const idEvent = parseInt(req.body.idEvent)
     const idClient = parseInt(req.body.idEvent)
@@ -145,6 +170,14 @@ async function unsaveEvent (req, res) {
   }
 }
 async function getPurchasesByClient (req, res) {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    return res.status(422).json({
+      errors: errors.array(),
+      success: false,
+      message: 'invalid data'
+    })
+  }
   try {
     const idClient = req.params.id
     const response = await Purchase.findAll({
