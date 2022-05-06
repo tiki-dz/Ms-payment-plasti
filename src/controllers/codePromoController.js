@@ -15,6 +15,7 @@ async function addCodePromo (req, res) {
     },
     defaults: {
       name: req.body.name,
+      use: req.body.use,
       idAdmin: req.body.idAdmin,
       value: req.body.value,
       startTime: req.body.startTime,
