@@ -12,13 +12,19 @@ async function purchase (req, res) {
     const codePromo = req.body.codePromo
     if ('codePromo' in req.body) {
       console.log(new Date())
-      const responseCP = await CodePromo.findOne({ where: { name: codePromo, endTime: { [Op.gte]: new Date() } } })
+      const responseCP = await CodePromo.findOne({ where: { name: codePromo, endTime: { [Op.gte]: new Date() }, startTime: { [Op.lte]: new Date() } } })
 
       if (responseCP === null) {
-        return res.status(500).send({ errors: 'codePromo not invalid', success: false, message: 'codePromo not found or not valid' })
+        return res.status(500).send({ errors: 'codePromo invalid', success: false, message: 'codePromo not found or not valid' })
+      } else {
+        const count = await Purchase.count({ where: { idClient: req.body.idClient, codePromo: responseCP.idCodePromo } })
+        if (count < responseCP.use) {
+          event.price = event.price * responseCP.value
+          req.body.codePromo = responseCP.id
+        } else {
+          return res.status(500).send({ errors: 'Code promo already used', success: false, message: 'max number of usage achieved' })
+        }
       }
-      event.price = event.price * responseCP.value
-      req.body.codePromo = responseCP.id
     }
 
     const session = await stripe.checkout.sessions.create({
