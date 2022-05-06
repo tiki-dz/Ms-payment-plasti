@@ -1,6 +1,6 @@
 
 module.exports = (sequelize, DataTypes) => {
-  const Purchase = sequelize.define('CodePromo', {
+  const CodePromo = sequelize.define('CodePromo', {
     idCodePromo: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -32,8 +32,13 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     }
   }, {
-    timestamps: true
+    timestamps: true,
+    classMethods: {
+      associate: function (models) {
+        CodePromo.hasOne(models.Purchase)
+      }
+    }
   })
 
-  return Purchase
+  return CodePromo
 }

@@ -17,10 +17,10 @@ async function purchase (req, res) {
       if (responseCP === null) {
         return res.status(500).send({ errors: 'codePromo invalid', success: false, message: 'codePromo not found or not valid' })
       } else {
-        const count = await Purchase.count({ where: { idClient: req.body.idClient, codePromo: responseCP.idCodePromo } })
+        const count = await Purchase.count({ where: { idClient: req.body.idClient, CodePromoIdCodePromo: responseCP.idCodePromo } })
         if (count < responseCP.use) {
-          event.price = event.price * responseCP.value
-          req.body.codePromo = responseCP.id
+          event.price = event.price * (100 - responseCP.value) / 100
+          req.body.codePromo = responseCP.idCodePromo
         } else {
           return res.status(500).send({ errors: 'Code promo already used', success: false, message: 'max number of usage achieved' })
         }
@@ -43,7 +43,7 @@ async function purchase (req, res) {
       // sending the infos in the metadata attribute
       metadata: { infos: JSON.stringify(req.body) },
       success_url: 'http://localhost:8090/home',
-      cancel_url: 'http://localhost:8090/home'
+      cancel_url: 'http://localhost:8090/home/EventList'
     })
 
     res.json({ url: session.url })
@@ -72,22 +72,28 @@ async function webhook (req, res) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
     // Fulfill the purchase...
-    console.log('Fulfilling metadata', session.metadata)
+    console.log('Fulfilling metadata', session)
     // getting  the infos from the metadata attribute
     const data = JSON.parse(session.metadata.infos)
-    const purchaseResponse = await Purchase.create({
-      nbTickets: data.data.length, idEvent: parseInt(data.event.id), idClient: parseInt(data.idClient), codePromo: parseInt(data.codePromo)
-    })
-    console.log(purchaseResponse)
-    console.log(data.data.length)
-    for (let i = 0; i < data.data.length; i++) {
-      console.log(data.data[i])
-      await MultipleTicket.create({
-        firstName: data.data[i].firstName, lastName: data.data[i].lastName, phoneNumber: data.data[i].phoneNumber, PurchaseIdPurchase: purchaseResponse.id
+    console.log(data)
+    try {
+      const purchaseResponse = await Purchase.create({
+        nbTickets: data.data.length, idEvent: parseInt(data.event.id), idClient: parseInt(data.idClient), CodePromoIdCodePromo: parseInt(data.codePromo)
       })
+      // here we should remove number of ticket from available
+      console.log(purchaseResponse)
+      console.log(data.data.length)
+      for (let i = 0; i < data.data.length; i++) {
+        console.log(data.data[i])
+        await MultipleTicket.create({
+          firstName: data.data[i].firstName, lastName: data.data[i].lastName, phoneNumber: data.data[i].phoneNumber, PurchaseIdPurchase: purchaseResponse.idPurchase
+        })
+      }
+    } catch (error) {
+      console.log(error)
+      return res.status(500).send(`Server Error: ${error.message}`)
     }
   }
-
   res.sendStatus(200)
 };
 async function saveEvent (req, res) {
