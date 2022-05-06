@@ -17,9 +17,18 @@ module.exports = (sequelize, DataTypes) => {
     nbTickets: {
       type: DataTypes.INTEGER,
       allowNull: false
+    },
+    codePromo: {
+      type: DataTypes.INTEGER,
+      allowNull: true
     }
   }, {
-    timestamps: true
+    timestamps: true,
+    classMethods: {
+      associate: function (models) {
+        Purchase.hasMany(models.MultipleTicket)
+      }
+    }
   })
 
   return Purchase
