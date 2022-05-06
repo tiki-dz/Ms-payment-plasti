@@ -1,18 +1,22 @@
 
 module.exports = (sequelize, DataTypes) => {
-  const Purchase = sequelize.define('CodePromo', {
+  const CodePromo = sequelize.define('CodePromo', {
     idCodePromo: {
       type: DataTypes.INTEGER,
       allowNull: false,
       autoIncrement: true,
       primaryKey: true
     },
+    name: {
+      type: DataTypes.STRING(45),
+      allowNull: false
+    },
     idAdmin: {
       type: DataTypes.INTEGER,
       allowNull: false
     },
     value: {
-      type: DataTypes.STRING(45),
+      type: DataTypes.INTEGER,
       allowNull: false
     },
     startTime: {
@@ -27,5 +31,5 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: true
   })
 
-  return Purchase
+  return CodePromo
 }
