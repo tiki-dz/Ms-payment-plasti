@@ -7,19 +7,19 @@ module.exports = (sequelize, DataTypes) => {
       autoIncrement: true,
       primaryKey: true
     },
-    idAdmin: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    },
-    value: {
-      type: DataTypes.STRING(45),
-      allowNull: false
-    },
     name: {
       type: DataTypes.STRING(45),
       allowNull: false
     },
     use: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    },
+    idAdmin: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    },
+    value: {
       type: DataTypes.INTEGER,
       allowNull: false
     },

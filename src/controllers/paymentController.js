@@ -77,7 +77,6 @@ async function webhook (req, res) {
     console.log(err)
     return res.status(400).send(`Webhook Error: ${err.message}`)
   }
-
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
     // Fulfill the purchase...

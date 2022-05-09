@@ -10,9 +10,7 @@ console.log(StripePublicKey, StripeSecretKey)
 const express = require('express')
 const cookieParser = require('cookie-parser')
 const logger = require('morgan')
-
 const app = express()
-
 // view engine setup
 app.use(logger('dev'))
 const bodyParser = require('body-parser')
@@ -22,7 +20,6 @@ app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser())
 app.use(bodyParser.urlencoded({ extended: true }))
 app.use('/api', indexRouter)
-
 app.listen(5003)
 // sequelize.query('SET FOREIGN_KEY_CHECKS = 0').then(function () {
 //   sequelize.sync({ alter: true })
