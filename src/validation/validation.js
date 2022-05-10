@@ -33,10 +33,10 @@ exports.validate = (method) => {
     }
     case 'purchase': {
       return [
-        body('data').isEmpty(),
-        body('event').isEmpty(),
+        body('data').not().isEmpty(),
+        body('event').not().isEmpty(),
         body('idClient').isInt(),
-        body('codePromo').isLength({ min: 5 })
+        body('codePromo').optional().isLength({ min: 5 })
       ]
     }
     case 'saveEvent': {
