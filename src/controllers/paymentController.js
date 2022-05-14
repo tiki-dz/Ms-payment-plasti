@@ -4,6 +4,7 @@ const { SavedEvent, Purchase, MultipleTicket, CodePromo } = require('../models')
 const stripe = require('stripe')(StripeSecretKey)
 const { Op } = require('sequelize')
 const { validationResult } = require('express-validator')
+const { getEventById, checkTokenClient } = require('../utils/communication')
 // open a session of payment and send the url
 async function purchase (req, res) {
   const errors = validationResult(req)
@@ -15,47 +16,57 @@ async function purchase (req, res) {
     })
   }
   try {
-    const data = req.body.data
-    const event = req.body.event
-    console.log(req.body)
-    const codePromo = req.body.codePromo
-    if ('codePromo' in req.body) {
-      console.log(new Date())
-      const responseCP = await CodePromo.findOne({ where: { name: codePromo, endTime: { [Op.gte]: new Date() }, startTime: { [Op.lte]: new Date() } } })
+    // check client Token
+    const token = req.headers['x-access-token']
+    const response = await checkTokenClient(token)
+    if (response.success) {
+      console.log('idClient:' + response.data.client.idClient)
+      // check for the event if exist
+      const event = await getEventById(req.body.event.id)
+      if (response.success) {
+        const data = req.body.data
+        const codePromo = req.body.codePromo
+        console.log(req.body)
+        console.log(event)
+        if ('codePromo' in req.body) {
+          console.log(new Date())
+          const responseCP = await CodePromo.findOne({ where: { name: codePromo, endTime: { [Op.gte]: new Date() }, startTime: { [Op.lte]: new Date() } } })
 
-      if (responseCP === null) {
-        return res.status(500).send({ errors: 'codePromo invalid', success: false, message: 'codePromo not found or not valid' })
-      } else {
-        const count = await Purchase.count({ where: { idClient: req.body.idClient, CodePromoIdCodePromo: responseCP.idCodePromo } })
-        if (count < responseCP.use) {
-          event.price = event.price * (100 - responseCP.value) / 100
-          req.body.codePromo = responseCP.idCodePromo
-        } else {
-          return res.status(500).send({ errors: 'Code promo already used', success: false, message: 'max number of usage achieved' })
+          if (responseCP === null) {
+            return res.status(500).send({ errors: 'codePromo invalid', success: false, message: 'codePromo not found or not valid' })
+          } else {
+            const count = await Purchase.count({ where: { idClient: response.data.client.idClient, CodePromoIdCodePromo: responseCP.idCodePromo } })
+            if (count < responseCP.use) {
+              event.price = event.data.price * (100 - responseCP.value) / 100
+              req.body.codePromo = responseCP.idCodePromo
+            } else {
+              return res.status(500).send({ errors: 'Code promo already used', success: false, message: 'max number of usage achieved' })
+            }
+          }
         }
+
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          mode: 'payment',
+          line_items: [{
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: event.name
+              },
+              unit_amount: event.price
+            },
+            quantity: data.length
+          }],
+          // sending the infos in the metadata attribute
+          metadata: { infos: JSON.stringify(req.body) },
+          success_url: 'http://localhost:8090/home',
+          cancel_url: 'http://localhost:8090/home/EventList'
+        })
+
+        res.json({ url: session.url })
       }
     }
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      mode: 'payment',
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: event.name
-          },
-          unit_amount: event.price
-        },
-        quantity: data.length
-      }],
-      // sending the infos in the metadata attribute
-      metadata: { infos: JSON.stringify(req.body) },
-      success_url: 'http://localhost:8090/home',
-      cancel_url: 'http://localhost:8090/home/EventList'
-    })
-
-    res.json({ url: session.url })
   } catch (error) {
     res.status(500).send({ errors: error, success: false, message: 'Purchase failed' })
     console.log(error)

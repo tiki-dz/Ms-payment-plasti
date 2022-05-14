@@ -35,7 +35,7 @@ exports.validate = (method) => {
       return [
         body('data').not().isEmpty(),
         body('event').not().isEmpty(),
-        body('idClient').isInt(),
+        // body('idClient').isInt(),
         body('codePromo').optional().isLength({ min: 5 })
       ]
     }
