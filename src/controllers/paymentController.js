@@ -4,7 +4,7 @@ const { SavedEvent, Purchase, MultipleTicket, CodePromo } = require('../models')
 const stripe = require('stripe')(StripeSecretKey)
 const { Op } = require('sequelize')
 const { validationResult } = require('express-validator')
-const { getEventById, checkTokenClient } = require('../utils/communication')
+const { getEventById, editEventById, checkTokenClient } = require('../utils/communication')
 // open a session of payment and send the url
 async function purchase (req, res) {
   const errors = validationResult(req)
@@ -23,21 +23,30 @@ async function purchase (req, res) {
       console.log('idClient:' + response.data.client.idClient)
       // check for the event if exist
       const event = await getEventById(req.body.event.id)
-      if (response.success) {
+      if (event.success) {
         const data = req.body.data
         const codePromo = req.body.codePromo
         console.log(req.body)
         console.log(event)
+        // const body = {
+        //   sub: true,
+        //   number: data.length + 1
+        // }
+        // const eventEdited = await editEventById({ id: req.body.event.id, body: body })
+        // console.log(eventEdited)
+        let neweventprice = event.price
         if ('codePromo' in req.body) {
           console.log(new Date())
+          // checking if codePromo exists and valid
           const responseCP = await CodePromo.findOne({ where: { name: codePromo, endTime: { [Op.gte]: new Date() }, startTime: { [Op.lte]: new Date() } } })
 
           if (responseCP === null) {
             return res.status(500).send({ errors: 'codePromo invalid', success: false, message: 'codePromo not found or not valid' })
           } else {
+            // checking if is used already or not
             const count = await Purchase.count({ where: { idClient: response.data.client.idClient, CodePromoIdCodePromo: responseCP.idCodePromo } })
             if (count < responseCP.use) {
-              event.price = event.data.price * (100 - responseCP.value) / 100
+              neweventprice = event.data.price * (100 - responseCP.value) / 100
               req.body.codePromo = responseCP.idCodePromo
             } else {
               return res.status(500).send({ errors: 'Code promo already used', success: false, message: 'max number of usage achieved' })
@@ -57,14 +66,25 @@ async function purchase (req, res) {
               unit_amount: event.price
             },
             quantity: data.length
+          },
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: event.name
+              },
+              unit_amount: neweventprice
+            },
+            quantity: 1
           }],
           // sending the infos in the metadata attribute
-          metadata: { infos: JSON.stringify(req.body) },
+          metadata: { infos: JSON.stringify(req.body), client: JSON.stringify(response.data.client) },
           success_url: 'http://localhost:8090/home',
           cancel_url: 'http://localhost:8090/home/EventList'
         })
 
-        res.json({ url: session.url })
+        // res.json({ url: session.url })
+        res.redirect(303, session.url)
       }
     }
   } catch (error) {
@@ -102,6 +122,11 @@ async function webhook (req, res) {
       // here we should remove number of ticket from available
       console.log(purchaseResponse)
       console.log(data.data.length)
+      const clientInfos = session.metadata.client
+      const client = await MultipleTicket.create({
+        firstName: clientInfos.firstName, lastName: clientInfos.lastName, phoneNumber: clientInfos.phoneNumber, PurchaseIdPurchase: purchaseResponse.idPurchase
+      })
+      console.log(client)
       for (let i = 0; i < data.data.length; i++) {
         console.log(data.data[i])
         await MultipleTicket.create({
@@ -112,6 +137,12 @@ async function webhook (req, res) {
       console.log(error)
       return res.status(500).send(`Server Error: ${error.message}`)
     }
+  } else if (event.type === 'checkout.session.async_payment_failed') {
+    const eventEdited = await editEventById({
+      sub: false,
+      number: 3
+    })
+    console.log(eventEdited)
   }
   res.sendStatus(200)
 };
