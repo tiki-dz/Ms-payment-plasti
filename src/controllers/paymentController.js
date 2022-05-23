@@ -225,7 +225,7 @@ async function unsaveEvent (req, res) {
   }
   try {
     const idEvent = parseInt(req.body.idEvent)
-    const idClient = parseInt(req.body.idEvent)
+    const idClient = parseInt(req.body.idClient)
     const count = await SavedEvent.count({
       where: {
         idEvent: idEvent,
@@ -265,6 +265,19 @@ async function getPurchasesByClient (req, res) {
       include: MultipleTicket,
       raw: true
     })
+    for (let i = 0; i < response.length; i++) {
+      try {
+        const event = await getEventById(response[i].idEvent)
+        response[i].event = event.data
+      } catch (error) {
+        console.log(i, response[i].idClient)
+        return res.status(500).json({
+          errors: [error],
+          success: false,
+          message: 'Error getting event by id'
+        })
+      }
+    }
     return res.status(200).json({ data: response, success: true, message: ['purchases retrieved successfuly'] })
   } catch (error) {
     return res.status(500).json({
