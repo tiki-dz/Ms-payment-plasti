@@ -5,6 +5,7 @@ const stripe = require('stripe')(StripeSecretKey)
 const { Op } = require('sequelize')
 const { validationResult } = require('express-validator')
 const { getEventById, editEventById, checkTokenClient } = require('../utils/communication')
+const { addScore } = require('../utils/eventsToPublishFunctions')
 
 // open a session of payment and send the url
 async function purchase (req, res) {
@@ -95,7 +96,7 @@ async function purchase (req, res) {
             mode: 'payment',
             line_items: lineItemsArray,
             // sending the infos in the metadata attribute
-            metadata: { infos: JSON.stringify(req.body), client: JSON.stringify(response.data.client) },
+            metadata: { infos: JSON.stringify(req.body), client: JSON.stringify(response.data.client), token: token },
             success_url: 'http://127.0.0.1:8090/home',
             cancel_url: 'http://127.0.0.1:8090/home/EventList',
             expires_at: Math.floor(Date.now() / 1000 + 3600)
@@ -131,12 +132,15 @@ async function webhook (req, res) {
   }
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
+
     // Fulfill the purchase...
     console.log('Fulfilling metadata', session)
     // getting  the infos from the metadata attribute
     const data = JSON.parse(session.metadata.infos)
     console.log('data:', data)
 
+    console.log('adding score')
+    addScore(session.metadata.token, 100)
     const clientInfos = JSON.parse(session.metadata.client).User
 
     try {
