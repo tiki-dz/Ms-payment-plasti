@@ -4,7 +4,7 @@ const { SavedEvent, Purchase, MultipleTicket, CodePromo } = require('../models')
 const stripe = require('stripe')(StripeSecretKey)
 const { Op } = require('sequelize')
 const { validationResult } = require('express-validator')
-const { getEventById, editEventById, checkTokenClient } = require('../utils/communication')
+const { getEventById, getClientById, editEventById, checkTokenClient } = require('../utils/communication')
 const { addScore } = require('../utils/eventsToPublishFunctions')
 
 // open a session of payment and send the url
@@ -282,6 +282,22 @@ async function getAllPurchases (req, res) {
       // group: ['idClient'],
       raw: true
     })
+    console.log(response[0])
+    for (let i = 0; i < response.length; i++) {
+      try {
+        const event = await getEventById(response[i].idEvent)
+        response[i].event = event.data
+        const client = await getClientById(response[i].idClient, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im4uZ3JlYmljaUBlc2ktc2JhLmR6IiwiaWF0IjoxNjUzMzA3NTcwLCJleHAiOjE2NTU4OTk1NzB9.g2jPPMWpI2nrPLNIffgTSnkFccJrJQ4NwYZaBC55tA4')
+        response[i].client = client.data
+      } catch (error) {
+        console.log(i, response[i].idClient)
+        return res.status(500).json({
+          errors: [error],
+          success: false,
+          message: 'Error getting event by id'
+        })
+      }
+    }
     return res.status(200).json({ data: response, success: true, message: ['purchases retrieved successfuly'] })
   } catch (error) {
     return res.status(500).json({
