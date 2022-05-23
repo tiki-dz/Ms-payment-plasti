@@ -5,6 +5,7 @@ const stripe = require('stripe')(StripeSecretKey)
 const { Op } = require('sequelize')
 const { validationResult } = require('express-validator')
 const { getEventById, editEventById, checkTokenClient } = require('../utils/communication')
+
 // open a session of payment and send the url
 async function purchase (req, res) {
   const errors = validationResult(req)
@@ -23,68 +24,87 @@ async function purchase (req, res) {
       console.log('idClient:' + response.data.client.idClient)
       // check for the event if exist
       const event = await getEventById(req.body.event.id)
+      let lineItemsArray = []
+      // event exists , checking if available
       if (event.success) {
         const data = req.body.data
         const codePromo = req.body.codePromo
-        console.log(req.body)
-        console.log(event)
-        // const body = {
-        //   sub: true,
-        //   number: data.length + 1
-        // }
-        // const eventEdited = await editEventById({ id: req.body.event.id, body: body })
-        // console.log(eventEdited)
-        let neweventprice = event.price
-        if ('codePromo' in req.body) {
-          console.log(new Date())
-          // checking if codePromo exists and valid
-          const responseCP = await CodePromo.findOne({ where: { name: codePromo, endTime: { [Op.gte]: new Date() }, startTime: { [Op.lte]: new Date() } } })
-
-          if (responseCP === null) {
-            return res.status(500).send({ errors: 'codePromo invalid', success: false, message: 'codePromo not found or not valid' })
-          } else {
-            // checking if is used already or not
-            const count = await Purchase.count({ where: { idClient: response.data.client.idClient, CodePromoIdCodePromo: responseCP.idCodePromo } })
-            if (count < responseCP.use) {
-              neweventprice = event.data.price * (100 - responseCP.value) / 100
-              req.body.codePromo = responseCP.idCodePromo
-            } else {
-              return res.status(500).send({ errors: 'Code promo already used', success: false, message: 'max number of usage achieved' })
-            }
+        if (event.data.ticketNb >= data.length + 1) {
+          // update the number of available tickets
+          const body = {
+            sub: true,
+            number: data.length + 1
           }
+          const eventEdited = await editEventById({ id: req.body.event.id, body: body })
+          console.log(eventEdited)
+          let neweventprice = event.data.price
+          if ('codePromo' in req.body) {
+            console.log(new Date())
+            // checking if codePromo exists and valid
+            const responseCP = await CodePromo.findOne({ where: { name: codePromo, endTime: { [Op.gte]: new Date() }, startTime: { [Op.lte]: new Date() } } })
+
+            if (responseCP === null) {
+              return res.status(500).send({ errors: 'codePromo invalid', success: false, message: 'codePromo not found or not valid' })
+            } else {
+            // checking if is used already or not
+              const count = await Purchase.count({ where: { idClient: response.data.client.idClient, CodePromoIdCodePromo: responseCP.idCodePromo } })
+              if (count < responseCP.use) {
+                // one ticket with codePromotion applied while others with the original price
+                neweventprice = Math.floor(event.data.price * (100 - responseCP.value) / 100)
+                req.body.codePromo = responseCP.idCodePromo
+                lineItemsArray = [{
+                  price_data: {
+                    currency: 'usd',
+                    product_data: {
+                      name: event.data.name
+                    },
+                    unit_amount: event.data.price
+                  },
+                  quantity: data.length
+                },
+                {
+                  price_data: {
+                    currency: 'usd',
+                    product_data: {
+                      name: event.data.name
+                    },
+                    unit_amount: neweventprice
+                  },
+                  quantity: 1
+                }]
+              } else {
+                return res.status(500).send({ errors: 'Code promo already used', success: false, message: 'max number of usage achieved' })
+              }
+            }
+          } else {
+            // all tickets are with the original price
+            lineItemsArray = [{
+              price_data: {
+                currency: 'usd',
+                product_data: {
+                  name: event.data.name
+                },
+                unit_amount: event.data.price
+              },
+              quantity: data.length + 1
+            }]
+          }
+          // open a session for payment
+          const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            mode: 'payment',
+            line_items: lineItemsArray,
+            // sending the infos in the metadata attribute
+            metadata: { infos: JSON.stringify(req.body), client: JSON.stringify(response.data.client) },
+            success_url: 'http://127.0.0.1:8090/home',
+            cancel_url: 'http://127.0.0.1:8090/home/EventList',
+            expires_at: Math.floor(Date.now() / 1000 + 3600)
+          })
+
+          res.json({ url: session.url })
+        } else {
+          res.status(500).send({ errors: 'Tickets Not available', success: false, message: 'Available:' + event.data.ticketNb + '/ Needed:' + (data.length + 1) })
         }
-
-        const session = await stripe.checkout.sessions.create({
-          payment_method_types: ['card'],
-          mode: 'payment',
-          line_items: [{
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: event.name
-              },
-              unit_amount: event.price
-            },
-            quantity: data.length
-          },
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: event.name
-              },
-              unit_amount: neweventprice
-            },
-            quantity: 1
-          }],
-          // sending the infos in the metadata attribute
-          metadata: { infos: JSON.stringify(req.body), client: JSON.stringify(response.data.client) },
-          success_url: 'http://localhost:8090/home',
-          cancel_url: 'http://localhost:8090/home/EventList'
-        })
-
-        // res.json({ url: session.url })
-        res.redirect(303, session.url)
       }
     }
   } catch (error) {
@@ -103,6 +123,7 @@ async function webhook (req, res) {
   console.log(sig)
   let event
   try {
+    // check if event coming from stripe by signature
     event = stripe.webhooks.constructEvent(payload, sig, endpointSecret)
   } catch (err) {
     console.log(err)
@@ -114,17 +135,22 @@ async function webhook (req, res) {
     console.log('Fulfilling metadata', session)
     // getting  the infos from the metadata attribute
     const data = JSON.parse(session.metadata.infos)
-    console.log(data)
+    console.log('data:', data)
+
+    const clientInfos = JSON.parse(session.metadata.client).User
+
     try {
+      let codeP = null
+      if ('codePromo' in data) codeP = parseInt(data.codePromo)
       const purchaseResponse = await Purchase.create({
-        nbTickets: data.data.length, idEvent: parseInt(data.event.id), idClient: parseInt(data.idClient), CodePromoIdCodePromo: parseInt(data.codePromo)
+        nbTickets: data.data.length + 1, idEvent: parseInt(data.event.id), idClient: parseInt(JSON.parse(session.metadata.client).idClient), CodePromoIdCodePromo: codeP
       })
       // here we should remove number of ticket from available
-      console.log(purchaseResponse)
-      console.log(data.data.length)
-      const clientInfos = session.metadata.client
+      //  console.log(purchaseResponse)
+      console.log(data.data.length, clientInfos)
+      //  phoneNumber: clientInfos.phoneNumber
       const client = await MultipleTicket.create({
-        firstName: clientInfos.firstName, lastName: clientInfos.lastName, phoneNumber: clientInfos.phoneNumber, PurchaseIdPurchase: purchaseResponse.idPurchase
+        firstName: clientInfos.firstName, lastName: clientInfos.lastName, phoneNumber: '0123456789', PurchaseIdPurchase: purchaseResponse.idPurchase
       })
       console.log(client)
       for (let i = 0; i < data.data.length; i++) {
@@ -137,15 +163,20 @@ async function webhook (req, res) {
       console.log(error)
       return res.status(500).send(`Server Error: ${error.message}`)
     }
-  } else if (event.type === 'checkout.session.async_payment_failed') {
+    // checkout.session.async_payment_failed'
+  } else if (event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
+    const session = event.data.object
+    const data = JSON.parse(session.metadata.infos)
     const eventEdited = await editEventById({
       sub: false,
-      number: 3
+      number: data.data.length + 1
     })
     console.log(eventEdited)
+    return res.status(500).send({ error: 'Payment failed' })
   }
   res.sendStatus(200)
 };
+
 async function saveEvent (req, res) {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
@@ -178,6 +209,7 @@ async function saveEvent (req, res) {
     })
   }
 }
+
 async function unsaveEvent (req, res) {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
@@ -210,6 +242,7 @@ async function unsaveEvent (req, res) {
     })
   }
 }
+
 async function getPurchasesByClient (req, res) {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
@@ -237,6 +270,7 @@ async function getPurchasesByClient (req, res) {
     })
   }
 }
+
 async function getAllPurchases (req, res) {
   try {
     const response = await Purchase.findAll({

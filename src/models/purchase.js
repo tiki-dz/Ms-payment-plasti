@@ -22,7 +22,11 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: true,
     classMethods: {
       associate: function (models) {
-        Purchase.hasMany(models.MultipleTicket)
+        Purchase.hasMany(models.MultipleTicket, {
+          foreignKey: {
+            allowNull: true
+          }
+        })
         Purchase.belongsTo(models.CodePromo)
       }
     }
