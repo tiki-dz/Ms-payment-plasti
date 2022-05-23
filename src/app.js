@@ -2,7 +2,7 @@ if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config()
 }
 // const { sequelize } = require('./models')
-
+const rabbitMq = require('./utils')
 const indexRouter = require('./routes/index')
 const StripePublicKey = process.env.STRIPE_SECRET_KEY
 const StripeSecretKey = process.env.STRIPE_PUBLIC_KEY
@@ -20,6 +20,7 @@ app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser())
 app.use(bodyParser.urlencoded({ extended: true }))
 app.use('/api', indexRouter)
+rabbitMq.CreatChannel()
 app.listen(5003)
 // sequelize.query('SET FOREIGN_KEY_CHECKS = 0').then(function () {
 //   sequelize.sync({ alter: true })
