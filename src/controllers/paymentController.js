@@ -321,4 +321,36 @@ async function getAllPurchases (req, res) {
   }
 }
 
-module.exports = { purchase, webhook, unsaveEvent, saveEvent, getPurchasesByClient, getAllPurchases }
+async function getSavedEvents (req, res) {
+  try {
+    const Saved = []
+    const idClient = req.params.id
+    const response = await SavedEvent.findAll({
+      where: {
+        idClient: idClient
+      }
+    })
+    for (let i = 0; i < response.length; i++) {
+      try {
+        const event = await getEventById(response[i].idEvent)
+        Saved.push(event.data)
+      } catch (error) {
+        console.log(i, response[i].idClient)
+        return res.status(500).json({
+          errors: [error],
+          success: false,
+          message: 'Error getting event by id'
+        })
+      }
+    }
+    return res.status(200).json({ data: Saved, success: true, message: ['Saved events retrieved successfuly'] })
+  } catch (error) {
+    return res.status(500).json({
+      errors: [error],
+      success: false,
+      message: 'process error'
+    })
+  }
+}
+
+module.exports = { purchase, webhook, unsaveEvent, saveEvent, getPurchasesByClient, getAllPurchases, getSavedEvents }
