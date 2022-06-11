@@ -21,4 +21,9 @@ router.post('/addscoreTest', function testingRabbitmq (req, res) {
   }
 })
 
+const ticketController = require('../controllers/ticketController')
+
+router.get('/:id/qrCode', ticketController.getQrCode)
+router.get('/qrCode', ticketController.checkQrCode)
+
 module.exports = router
