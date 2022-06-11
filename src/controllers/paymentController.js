@@ -6,6 +6,7 @@ const { Op } = require('sequelize')
 const { validationResult } = require('express-validator')
 const { getEventById, getClientById, editEventById, checkTokenClient } = require('../utils/communication')
 const { addScore } = require('../utils/eventsToPublishFunctions')
+const ticketController = require('../controllers/ticketController')
 
 // open a session of payment and send the url
 async function purchase (req, res) {
@@ -114,7 +115,7 @@ async function purchase (req, res) {
   }
 }
 // my local webhook secret key
-const endpointSecret = 'whsec_6d049ad54e2691e2c017292b92c2e40714d0965786b60f580c6105fb369e5ac9'
+const endpointSecret = 'whsec_omD0hpYVYzyogWjK4vVQXKGLJ9T9Yn90'
 
 // a webhook for the payment intents to save infos to the database
 async function webhook (req, res) {
@@ -125,7 +126,7 @@ async function webhook (req, res) {
   let event
   try {
     // check if event coming from stripe by signature
-    event = stripe.webhooks.constructEvent(payload, sig, endpointSecret)
+    event = stripe.webhooks.constructEvent(payload, endpointSecret)
   } catch (err) {
     console.log(err)
     return res.status(400).send(`Webhook Error: ${err.message}`)
@@ -262,15 +263,29 @@ async function getPurchasesByClient (req, res) {
       where: {
         idClient: idClient
       },
-      include: MultipleTicket,
-      raw: true
+      include: MultipleTicket
     })
     for (let i = 0; i < response.length; i++) {
       try {
         const event = await getEventById(response[i].idEvent)
-        response[i].event = event.data
+        response[i].setDataValue('event', event)
+        console.log(event)
+        for (let k = 0; k < response[i].MultipleTickets.length; k++) {
+          try {
+            console.log(response[i].MultipleTickets.length)
+            console.log('idticket', response[i].MultipleTickets[k].idTicket)
+            const qrCode = await ticketController.GetQrCode(response[i].MultipleTickets[k].idTicket)
+            console.log('qrcode: ', qrCode.data)
+            response[i].MultipleTickets[k].setDataValue('qrCode', qrCode.data)
+          } catch (error) {
+            return res.status(500).json({
+              errors: [error],
+              success: false,
+              message: 'Error getting qrCode'
+            })
+          }
+        }
       } catch (error) {
-        console.log(i, response[i].idClient)
         return res.status(500).json({
           errors: [error],
           success: false,

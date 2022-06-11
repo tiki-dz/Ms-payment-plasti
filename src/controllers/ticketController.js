@@ -1,10 +1,12 @@
 const { getEventById } = require('../utils/communication')
+const { default: axios } = require('axios')
 
 const { MultipleTicket, Purchase } = require('../models')
 const jwt = require('jsonwebtoken')
 
 async function getQrCode (req, res) {
   const id = req.params.id
+  console.log('req', req)
   try {
     const ticket = await MultipleTicket.findOne({
       where: {
@@ -71,5 +73,13 @@ async function checkQrCode (req, res) {
     })
   }
 }
+async function GetQrCode (id) {
+  const response = await axios.get('http://localhost:5003/api/payment/' + id + '/qrCode')
+  return response.data
+}
+async function CheckQrCode (id) {
+  const response = await axios.get('http://localhost:5003/api/payment/qrCode')
+  return response.data
+}
 
-module.exports = { getQrCode, checkQrCode }
+module.exports = { getQrCode, checkQrCode, GetQrCode, CheckQrCode }
