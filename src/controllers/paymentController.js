@@ -312,7 +312,7 @@ async function getAllPurchases (req, res) {
     const response2 = await Purchase.findAndCountAll({
       include: MultipleTicket,
       // group: ['idClient'],
-      raw: true,
+
       limit,
       offset,
       order: [
@@ -323,10 +323,11 @@ async function getAllPurchases (req, res) {
     for (let i = 0; i < response.achats.length; i++) {
       try {
         const event = await getEventById(response.achats[i].idEvent)
-        response.achats[i].event = event.data
-        const client = await getClientById(response.achats[i].idClient, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im4uZ3JlYmljaUBlc2ktc2JhLmR6IiwiaWF0IjoxNjUzMzA3NTcwLCJleHAiOjE2NTU4OTk1NzB9.g2jPPMWpI2nrPLNIffgTSnkFccJrJQ4NwYZaBC55tA4')
-        response.achats[i].client = client.data
+        response.achats[i].setDataValue('event', event.data) 
+        const client = await getClientById(response.achats[i].idClient, req.headers['x-access-token'])
+        response.achats[i].setDataValue('client', client.data)
       } catch (error) {
+        console.log(error)
         return res.status(500).json({
           errors: [error],
           success: false,
