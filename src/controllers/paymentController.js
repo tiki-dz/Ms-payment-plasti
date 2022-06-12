@@ -1,3 +1,4 @@
+/* eslint-disable no-trailing-spaces */
 require('dotenv').config()
 const StripeSecretKey = process.env.STRIPE_SECRET_KEY
 const { SavedEvent, Purchase, MultipleTicket, CodePromo } = require('../models')
@@ -119,14 +120,16 @@ const endpointSecret = 'whsec_omD0hpYVYzyogWjK4vVQXKGLJ9T9Yn90'
 
 // a webhook for the payment intents to save infos to the database
 async function webhook (req, res) {
-  const payload = req.body
+  console.log('req', req)
+  console.log('signature', req.rawHeaders[13])
 
+  const payload = req.body
+  console.log('payload', payload.data)
   const sig = req.headers['stripe-signature']
-  console.log(sig)
   let event
   try {
     // check if event coming from stripe by signature
-    event = stripe.webhooks.constructEvent(payload, endpointSecret)
+    event = stripe.webhooks.constructEvent(payload, sig, endpointSecret)
   } catch (err) {
     console.log(err)
     return res.status(400).send(`Webhook Error: ${err.message}`)
@@ -302,23 +305,28 @@ async function getPurchasesByClient (req, res) {
     })
   }
 }
-
 async function getAllPurchases (req, res) {
+  const { page, size } = req.query
+  const { limit, offset } = getPagination(page, size)
   try {
-    const response = await Purchase.findAll({
+    const response2 = await Purchase.findAndCountAll({
       include: MultipleTicket,
       // group: ['idClient'],
-      raw: true
+      raw: true,
+      limit,
+      offset,
+      order: [
+        ['createdAt', 'desc']
+      ]
     })
-    console.log(response[0])
-    for (let i = 0; i < response.length; i++) {
+    const response = getPagingData(response2, page, limit)
+    for (let i = 0; i < response.achats.length; i++) {
       try {
-        const event = await getEventById(response[i].idEvent)
-        response[i].event = event.data
-        const client = await getClientById(response[i].idClient, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im4uZ3JlYmljaUBlc2ktc2JhLmR6IiwiaWF0IjoxNjUzMzA3NTcwLCJleHAiOjE2NTU4OTk1NzB9.g2jPPMWpI2nrPLNIffgTSnkFccJrJQ4NwYZaBC55tA4')
-        response[i].client = client.data
+        const event = await getEventById(response.achats[i].idEvent)
+        response.achats[i].event = event.data
+        const client = await getClientById(response.achats[i].idClient, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im4uZ3JlYmljaUBlc2ktc2JhLmR6IiwiaWF0IjoxNjUzMzA3NTcwLCJleHAiOjE2NTU4OTk1NzB9.g2jPPMWpI2nrPLNIffgTSnkFccJrJQ4NwYZaBC55tA4')
+        response.achats[i].client = client.data
       } catch (error) {
-        console.log(i, response[i].idClient)
         return res.status(500).json({
           errors: [error],
           success: false,
@@ -335,7 +343,17 @@ async function getAllPurchases (req, res) {
     })
   }
 }
-
+const getPagingData = (data, page, limit) => {
+  const { count: totalItems, rows: achats } = data
+  const currentPage = page ? +page : 0
+  const totalPages = Math.ceil(totalItems / limit)
+  return { totalItems, achats, totalPages, currentPage }
+}
+const getPagination = (page, size) => {
+  const limit = size ? +size : 5
+  const offset = page ? page * limit : 0
+  return { limit, offset }
+}
 async function getSavedEvents (req, res) {
   try {
     const Saved = []
