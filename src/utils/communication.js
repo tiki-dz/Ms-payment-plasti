@@ -20,4 +20,4 @@ async function checkTokenClient (token) {
   })
   return response.data
 }
-module.exports = { getEventById, checkTokenClient, editEventById, getAdminId }
+module.exports = { getEventById, checkTokenClient, editEventById }
