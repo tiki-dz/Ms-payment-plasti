@@ -4,6 +4,7 @@ async function getEventById (id) {
   const response = await axios.get('http://localhost:5002/api/admin/event/' + id)
   return response.data
 }
+
 async function editEventById (content) {
   const response = await axios.post('http://localhost:5002/api/admin/event/' + content.id, content.body)
   return response.data
