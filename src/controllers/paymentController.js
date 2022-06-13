@@ -1,10 +1,14 @@
+/* eslint-disable no-trailing-spaces */
 require('dotenv').config()
 const StripeSecretKey = process.env.STRIPE_SECRET_KEY
 const { SavedEvent, Purchase, MultipleTicket, CodePromo } = require('../models')
 const stripe = require('stripe')(StripeSecretKey)
 const { Op } = require('sequelize')
 const { validationResult } = require('express-validator')
-const { getEventById, editEventById, checkTokenClient } = require('../utils/communication')
+const { getEventById, getClientById, editEventById, checkTokenClient } = require('../utils/communication')
+const { addScore } = require('../utils/eventsToPublishFunctions')
+const ticketController = require('../controllers/ticketController')
+
 // open a session of payment and send the url
 async function purchase (req, res) {
   const errors = validationResult(req)
@@ -23,68 +27,87 @@ async function purchase (req, res) {
       console.log('idClient:' + response.data.client.idClient)
       // check for the event if exist
       const event = await getEventById(req.body.event.id)
+      let lineItemsArray = []
+      // event exists , checking if available
       if (event.success) {
         const data = req.body.data
         const codePromo = req.body.codePromo
-        console.log(req.body)
-        console.log(event)
-        // const body = {
-        //   sub: true,
-        //   number: data.length + 1
-        // }
-        // const eventEdited = await editEventById({ id: req.body.event.id, body: body })
-        // console.log(eventEdited)
-        let neweventprice = event.price
-        if ('codePromo' in req.body) {
-          console.log(new Date())
-          // checking if codePromo exists and valid
-          const responseCP = await CodePromo.findOne({ where: { name: codePromo, endTime: { [Op.gte]: new Date() }, startTime: { [Op.lte]: new Date() } } })
-
-          if (responseCP === null) {
-            return res.status(500).send({ errors: 'codePromo invalid', success: false, message: 'codePromo not found or not valid' })
-          } else {
-            // checking if is used already or not
-            const count = await Purchase.count({ where: { idClient: response.data.client.idClient, CodePromoIdCodePromo: responseCP.idCodePromo } })
-            if (count < responseCP.use) {
-              neweventprice = event.data.price * (100 - responseCP.value) / 100
-              req.body.codePromo = responseCP.idCodePromo
-            } else {
-              return res.status(500).send({ errors: 'Code promo already used', success: false, message: 'max number of usage achieved' })
-            }
+        if (event.data.ticketNb >= data.length + 1) {
+          // update the number of available tickets
+          const body = {
+            sub: true,
+            number: data.length + 1
           }
+          const eventEdited = await editEventById({ id: req.body.event.id, body: body })
+          console.log(eventEdited)
+          let neweventprice = event.data.price
+          if ('codePromo' in req.body) {
+            console.log(new Date())
+            // checking if codePromo exists and valid
+            const responseCP = await CodePromo.findOne({ where: { name: codePromo, endTime: { [Op.gte]: new Date() }, startTime: { [Op.lte]: new Date() } } })
+
+            if (responseCP === null) {
+              return res.status(500).send({ errors: 'codePromo invalid', success: false, message: 'codePromo not found or not valid' })
+            } else {
+            // checking if is used already or not
+              const count = await Purchase.count({ where: { idClient: response.data.client.idClient, CodePromoIdCodePromo: responseCP.idCodePromo } })
+              if (count < responseCP.use) {
+                // one ticket with codePromotion applied while others with the original price
+                neweventprice = Math.floor(event.data.price * (100 - responseCP.value) / 100)
+                req.body.codePromo = responseCP.idCodePromo
+                lineItemsArray = [{
+                  price_data: {
+                    currency: 'usd',
+                    product_data: {
+                      name: event.data.name
+                    },
+                    unit_amount: event.data.price
+                  },
+                  quantity: data.length
+                },
+                {
+                  price_data: {
+                    currency: 'usd',
+                    product_data: {
+                      name: event.data.name
+                    },
+                    unit_amount: neweventprice
+                  },
+                  quantity: 1
+                }]
+              } else {
+                return res.status(500).send({ errors: 'Code promo already used', success: false, message: 'max number of usage achieved' })
+              }
+            }
+          } else {
+            // all tickets are with the original price
+            lineItemsArray = [{
+              price_data: {
+                currency: 'usd',
+                product_data: {
+                  name: event.data.name
+                },
+                unit_amount: event.data.price
+              },
+              quantity: data.length + 1
+            }]
+          }
+          // open a session for payment
+          const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            mode: 'payment',
+            line_items: lineItemsArray,
+            // sending the infos in the metadata attribute
+            metadata: { infos: JSON.stringify(req.body), client: JSON.stringify(response.data.client), token: token },
+            success_url: 'http://127.0.0.1:8090/home',
+            cancel_url: 'http://127.0.0.1:8090/home/EventList',
+            expires_at: Math.floor(Date.now() / 1000 + 3600)
+          })
+
+          res.json({ url: session.url })
+        } else {
+          res.status(500).send({ errors: 'Tickets Not available', success: false, code: 0, message: 'Available:' + event.data.ticketNb + '/ Needed:' + (data.length + 1) })
         }
-
-        const session = await stripe.checkout.sessions.create({
-          payment_method_types: ['card'],
-          mode: 'payment',
-          line_items: [{
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: event.name
-              },
-              unit_amount: event.price
-            },
-            quantity: data.length
-          },
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: event.name
-              },
-              unit_amount: neweventprice
-            },
-            quantity: 1
-          }],
-          // sending the infos in the metadata attribute
-          metadata: { infos: JSON.stringify(req.body), client: JSON.stringify(response.data.client) },
-          success_url: 'http://localhost:8090/home',
-          cancel_url: 'http://localhost:8090/home/EventList'
-        })
-
-        // res.json({ url: session.url })
-        res.redirect(303, session.url)
       }
     }
   } catch (error) {
@@ -93,16 +116,19 @@ async function purchase (req, res) {
   }
 }
 // my local webhook secret key
-const endpointSecret = 'whsec_6d049ad54e2691e2c017292b92c2e40714d0965786b60f580c6105fb369e5ac9'
+const endpointSecret = 'whsec_omD0hpYVYzyogWjK4vVQXKGLJ9T9Yn90'
 
 // a webhook for the payment intents to save infos to the database
 async function webhook (req, res) {
-  const payload = req.body
+  console.log('req', req)
+  console.log('signature', req.rawHeaders[13])
 
+  const payload = req.body
+  console.log('payload', payload.data)
   const sig = req.headers['stripe-signature']
-  console.log(sig)
   let event
   try {
+    // check if event coming from stripe by signature
     event = stripe.webhooks.constructEvent(payload, sig, endpointSecret)
   } catch (err) {
     console.log(err)
@@ -110,21 +136,29 @@ async function webhook (req, res) {
   }
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
+
     // Fulfill the purchase...
     console.log('Fulfilling metadata', session)
     // getting  the infos from the metadata attribute
     const data = JSON.parse(session.metadata.infos)
-    console.log(data)
+    console.log('data:', data)
+
+    console.log('adding score')
+    addScore(session.metadata.token, 100)
+    const clientInfos = JSON.parse(session.metadata.client).User
+
     try {
+      let codeP = null
+      if ('codePromo' in data) codeP = parseInt(data.codePromo)
       const purchaseResponse = await Purchase.create({
-        nbTickets: data.data.length, idEvent: parseInt(data.event.id), idClient: parseInt(data.idClient), CodePromoIdCodePromo: parseInt(data.codePromo)
+        nbTickets: data.data.length + 1, idEvent: parseInt(data.event.id), idClient: parseInt(JSON.parse(session.metadata.client).idClient), CodePromoIdCodePromo: codeP
       })
       // here we should remove number of ticket from available
-      console.log(purchaseResponse)
-      console.log(data.data.length)
-      const clientInfos = session.metadata.client
+      //  console.log(purchaseResponse)
+      console.log(data.data.length, clientInfos)
+      //  phoneNumber: clientInfos.phoneNumber
       const client = await MultipleTicket.create({
-        firstName: clientInfos.firstName, lastName: clientInfos.lastName, phoneNumber: clientInfos.phoneNumber, PurchaseIdPurchase: purchaseResponse.idPurchase
+        firstName: clientInfos.firstName, lastName: clientInfos.lastName, phoneNumber: '0123456789', PurchaseIdPurchase: purchaseResponse.idPurchase
       })
       console.log(client)
       for (let i = 0; i < data.data.length; i++) {
@@ -137,15 +171,20 @@ async function webhook (req, res) {
       console.log(error)
       return res.status(500).send(`Server Error: ${error.message}`)
     }
-  } else if (event.type === 'checkout.session.async_payment_failed') {
+    // checkout.session.async_payment_failed'
+  } else if (event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
+    const session = event.data.object
+    const data = JSON.parse(session.metadata.infos)
     const eventEdited = await editEventById({
       sub: false,
-      number: 3
+      number: data.data.length + 1
     })
     console.log(eventEdited)
+    return res.status(500).send({ error: 'Payment failed' })
   }
   res.sendStatus(200)
 };
+
 async function saveEvent (req, res) {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
@@ -178,6 +217,7 @@ async function saveEvent (req, res) {
     })
   }
 }
+
 async function unsaveEvent (req, res) {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
@@ -189,7 +229,7 @@ async function unsaveEvent (req, res) {
   }
   try {
     const idEvent = parseInt(req.body.idEvent)
-    const idClient = parseInt(req.body.idEvent)
+    const idClient = parseInt(req.body.idClient)
     const count = await SavedEvent.count({
       where: {
         idEvent: idEvent,
@@ -210,6 +250,7 @@ async function unsaveEvent (req, res) {
     })
   }
 }
+
 async function getPurchasesByClient (req, res) {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
@@ -225,9 +266,36 @@ async function getPurchasesByClient (req, res) {
       where: {
         idClient: idClient
       },
-      include: MultipleTicket,
-      raw: true
+      include: MultipleTicket
     })
+    for (let i = 0; i < response.length; i++) {
+      try {
+        const event = await getEventById(response[i].idEvent)
+        response[i].setDataValue('event', event)
+        console.log(event)
+        for (let k = 0; k < response[i].MultipleTickets.length; k++) {
+          try {
+            console.log(response[i].MultipleTickets.length)
+            console.log('idticket', response[i].MultipleTickets[k].idTicket)
+            const qrCode = await ticketController.GetQrCode(response[i].MultipleTickets[k].idTicket)
+            console.log('qrcode: ', qrCode.data)
+            response[i].MultipleTickets[k].setDataValue('qrCode', qrCode.data)
+          } catch (error) {
+            return res.status(500).json({
+              errors: [error],
+              success: false,
+              message: 'Error getting qrCode'
+            })
+          }
+        }
+      } catch (error) {
+        return res.status(500).json({
+          errors: [error],
+          success: false,
+          message: 'Error getting event by id'
+        })
+      }
+    }
     return res.status(200).json({ data: response, success: true, message: ['purchases retrieved successfuly'] })
   } catch (error) {
     return res.status(500).json({
@@ -238,12 +306,35 @@ async function getPurchasesByClient (req, res) {
   }
 }
 async function getAllPurchases (req, res) {
+  const { page, size } = req.query
+  const { limit, offset } = getPagination(page, size)
   try {
-    const response = await Purchase.findAll({
+    const response2 = await Purchase.findAndCountAll({
       include: MultipleTicket,
       // group: ['idClient'],
-      raw: true
+
+      limit,
+      offset,
+      order: [
+        ['createdAt', 'desc']
+      ]
     })
+    const response = getPagingData(response2, page, limit)
+    for (let i = 0; i < response.achats.length; i++) {
+      try {
+        const event = await getEventById(response.achats[i].idEvent)
+        response.achats[i].setDataValue('event', event.data) 
+        const client = await getClientById(response.achats[i].idClient, req.headers['x-access-token'])
+        response.achats[i].setDataValue('client', client.data)
+      } catch (error) {
+        console.log(error)
+        return res.status(500).json({
+          errors: [error],
+          success: false,
+          message: 'Error getting event by id'
+        })
+      }
+    }
     return res.status(200).json({ data: response, success: true, message: ['purchases retrieved successfuly'] })
   } catch (error) {
     return res.status(500).json({
@@ -253,5 +344,47 @@ async function getAllPurchases (req, res) {
     })
   }
 }
+const getPagingData = (data, page, limit) => {
+  const { count: totalItems, rows: achats } = data
+  const currentPage = page ? +page : 0
+  const totalPages = Math.ceil(totalItems / limit)
+  return { totalItems, achats, totalPages, currentPage }
+}
+const getPagination = (page, size) => {
+  const limit = size ? +size : 5
+  const offset = page ? page * limit : 0
+  return { limit, offset }
+}
+async function getSavedEvents (req, res) {
+  try {
+    const Saved = []
+    const idClient = req.params.id
+    const response = await SavedEvent.findAll({
+      where: {
+        idClient: idClient
+      }
+    })
+    for (let i = 0; i < response.length; i++) {
+      try {
+        const event = await getEventById(response[i].idEvent)
+        Saved.push(event.data)
+      } catch (error) {
+        console.log(i, response[i].idClient)
+        return res.status(500).json({
+          errors: [error],
+          success: false,
+          message: 'Error getting event by id'
+        })
+      }
+    }
+    return res.status(200).json({ data: Saved, success: true, message: ['Saved events retrieved successfuly'] })
+  } catch (error) {
+    return res.status(500).json({
+      errors: [error],
+      success: false,
+      message: 'process error'
+    })
+  }
+}
 
-module.exports = { purchase, webhook, unsaveEvent, saveEvent, getPurchasesByClient, getAllPurchases }
+module.exports = { purchase, webhook, unsaveEvent, saveEvent, getPurchasesByClient, getAllPurchases, getSavedEvents }

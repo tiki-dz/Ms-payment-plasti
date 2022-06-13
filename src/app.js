@@ -9,6 +9,7 @@ const StripeSecretKey = process.env.STRIPE_PUBLIC_KEY
 console.log(StripePublicKey, StripeSecretKey)
 const express = require('express')
 const cookieParser = require('cookie-parser')
+const eurekaHelper = require('./eurekaHelper/eurekaHelper.js')
 const logger = require('morgan')
 const app = express()
 // view engine setup
@@ -21,7 +22,8 @@ app.use(cookieParser())
 app.use(bodyParser.urlencoded({ extended: true }))
 app.use('/api', indexRouter)
 rabbitMq.CreatChannel()
-app.listen(5003)
+eurekaHelper.registerWithEureka('service-purchase', process.env.PORT)
+app.listen(process.env.PORT)
 // sequelize.query('SET FOREIGN_KEY_CHECKS = 0').then(function () {
 //   sequelize.sync({ alter: true })
 // })

@@ -9,6 +9,7 @@ router.post('/saveEvent', validation.validate('saveEvent'), paymentController.sa
 router.post('/unsaveEvent', validation.validate('saveEvent'), paymentController.unsaveEvent)
 router.get('/:id/purchases', validation.validate('getPurchases'), paymentController.getPurchasesByClient)
 router.get('/purchases', paymentController.getAllPurchases)
+router.get('/:id/savedEvents', validation.validate('getPurchases'), paymentController.getSavedEvents)
 
 router.post('/addscoreTest', function testingRabbitmq (req, res) {
   try {
@@ -19,5 +20,10 @@ router.post('/addscoreTest', function testingRabbitmq (req, res) {
     res.send(error)
   }
 })
+
+const ticketController = require('../controllers/ticketController')
+
+router.get('/:id/qrCode', ticketController.getQrCode)
+router.get('/qrCode', ticketController.checkQrCode)
 
 module.exports = router
