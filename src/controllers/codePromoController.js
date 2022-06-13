@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator/check')
 const { CodePromo } = require('../models')
 async function addCodePromo (req, res) {
   const errors = validationResult(req)
+  console.log(errors)
   if (!errors.isEmpty()) {
     return res.status(422).json({
       errors: errors.array(),
@@ -80,8 +81,16 @@ async function patchCodePromo (req, res) {
   })
 }
 async function getCodePromo (req, res) {
-  CodePromo.findAll().then((codes) => {
-    return res.status(200).send({ data: codes, success: true, message: 'code promos' })
+  const { page, size } = req.query
+  const { limit, offset } = getPagination(page, size)
+  CodePromo.findAndCountAll({
+    offset: offset,
+    limit: limit
+  }).then((codes) => {
+    const response = getPagingData(codes, page, limit)
+    return res
+      .status(200)
+      .send({ data: response, success: true, message: 'code promos' })
   })
 }
 async function checkCodePromo (req, res) {
@@ -104,6 +113,17 @@ async function checkCodePromo (req, res) {
       return res.status(200).send({ data: { newPrice: (req.body.price) - (code.value / 100) * req.body.price }, success: true, message: 'code promo applied successfully' })
     }
   })
+}
+const getPagingData = (data, page, limit) => {
+  const { count: totalItems, rows: codes } = data
+  const currentPage = page ? +page : 0
+  const totalPages = Math.ceil(totalItems / limit)
+  return { totalItems, codes, totalPages, currentPage }
+}
+const getPagination = (page, size) => {
+  const limit = size ? +size : 5
+  const offset = page ? page * limit : 0
+  return { limit, offset }
 }
 
 module.exports = { addCodePromo, deleteCodePromo, patchCodePromo, getCodePromo, checkCodePromo }
