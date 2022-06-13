@@ -19,6 +19,15 @@ async function editEventById (content) {
   const response = await axios.post('http://localhost:5002/api/admin/event/' + content.id, content.body)
   return response.data
 }
+async function getClientById (id, token) {
+  const response = await axios.get('http://localhost:5001/api/admin/client/' + id, {
+    headers: {
+      'x-access-token': token
+    }
+  })
+
+  return response.data
+}
 async function checkTokenClient (token) {
   const response = await axios.get('http://localhost:5001/api/tokenCheck', {
     headers: {
@@ -30,4 +39,4 @@ async function checkTokenClient (token) {
   })
   return response.data
 }
-module.exports = { getEventById, checkTokenClient, editEventById, getAdminByToken }
+module.exports = { getEventById, getClientById, checkTokenClient, editEventById, getAdminByToken }
