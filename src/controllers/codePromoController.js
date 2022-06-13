@@ -1,5 +1,7 @@
 const { validationResult } = require('express-validator/check')
 const { CodePromo } = require('../models')
+const { Op } = require('sequelize')
+const { getAdminByToken } = require('../utils/communication')
 async function addCodePromo (req, res) {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
@@ -9,6 +11,12 @@ async function addCodePromo (req, res) {
       message: 'invalid data'
     })
   }
+  const adminObject = await getAdminByToken(req.headers['x-access-token'])
+  if (!adminObject) {
+    return res
+      .status(500)
+      .send({ success: false, message: 'code promos failed' })
+  }
   CodePromo.findOrCreate({
     where: {
       name: req.body.name
@@ -16,7 +24,7 @@ async function addCodePromo (req, res) {
     defaults: {
       name: req.body.name,
       use: req.body.use,
-      idAdmin: req.body.idAdmin,
+      idAdmin: adminObject.data.Administrator.idAdmin,
       value: req.body.value,
       startTime: req.body.startTime,
       endTime: req.body.endTime
@@ -95,15 +103,37 @@ async function checkCodePromo (req, res) {
   }
   CodePromo.findOne({
     where: {
-      name: req.body.name
+      name: req.body.name,
+      endTime: { [Op.gte]: new Date() },
+      startTime: { [Op.lte]: new Date() }
     }
   }).then((code) => {
     if (!code) {
-      return res.status(404).send({ data: null, success: false, message: 'row not found' })
+      return res
+        .status(404)
+        .send({ data: null, success: false, message: 'row not found' })
     } else {
-      return res.status(200).send({ data: { newPrice: (req.body.price) - (code.value / 100) * req.body.price }, success: true, message: 'code promo applied successfully' })
+      return res
+        .status(200)
+        .send({
+          data: {
+            newPrice: req.body.price - (code.value / 100) * req.body.price
+          },
+          success: true,
+          message: 'code promo applied successfully'
+        })
     }
   })
 }
-
+const getPagingData = (data, page, limit) => {
+  const { count: totalItems, rows: codes } = data
+  const currentPage = page ? +page : 0
+  const totalPages = Math.ceil(totalItems / limit)
+  return { totalItems, codes, totalPages, currentPage }
+}
+const getPagination = (page, size) => {
+  const limit = size ? +size : 5
+  const offset = page ? page * limit : 0
+  return { limit, offset }
+}
 module.exports = { addCodePromo, deleteCodePromo, patchCodePromo, getCodePromo, checkCodePromo }

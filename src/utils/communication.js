@@ -5,7 +5,7 @@ async function getEventById (id) {
   return response.data
 }
 async function getAdminByToken (token) {
-  const response = await axios.get('http://localhost:5002/api/admin/profile', {
+  const response = await axios.get('http://localhost:5001/api/admin/profile', {
     headers: {
       'x-access-token': token,
       role: 'admin',

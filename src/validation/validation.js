@@ -5,7 +5,6 @@ exports.validate = (method) => {
     case 'addCodePromo': {
       return [
         body('name', 'Invalid value min length 1').isLength({ min: 1, max: 10 }),
-        body('idAdmin').isInt(),
         body('value').isInt({ min: 1, max: 99 }),
         body('startTime').isISO8601().toDate(),
         body('endTime').isISO8601().toDate()
@@ -33,10 +32,10 @@ exports.validate = (method) => {
     }
     case 'purchase': {
       return [
-        body('data').not().isEmpty(),
+        // body('data').not().isEmpty(),
         body('event').not().isEmpty(),
         // body('idClient').isInt(),
-        body('codePromo').optional().isLength({ min: 5 })
+        body('codePromo').optional().isLength({ min: 1 })
       ]
     }
     case 'saveEvent': {
