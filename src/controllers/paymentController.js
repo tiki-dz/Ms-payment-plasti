@@ -106,7 +106,7 @@ async function purchase (req, res) {
 
           res.json({ url: session.url })
         } else {
-          res.status(500).send({ errors: 'Tickets Not available', success: false, message: 'Available:' + event.data.ticketNb + '/ Needed:' + (data.length + 1) })
+          res.status(500).send({ errors: 'Tickets Not available', success: false, code: 0, message: 'Available:' + event.data.ticketNb + '/ Needed:' + (data.length + 1) })
         }
       }
     }
