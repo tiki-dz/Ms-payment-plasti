@@ -1,3 +1,4 @@
+/* eslint-disable no-trailing-spaces */
 require('dotenv').config()
 const StripeSecretKey = process.env.STRIPE_SECRET_KEY
 const { SavedEvent, Purchase, MultipleTicket, CodePromo } = require('../models')
@@ -6,6 +7,7 @@ const { Op } = require('sequelize')
 const { validationResult } = require('express-validator')
 const { getEventById, getClientById, editEventById, checkTokenClient } = require('../utils/communication')
 const { addScore } = require('../utils/eventsToPublishFunctions')
+const ticketController = require('../controllers/ticketController')
 
 // open a session of payment and send the url
 async function purchase (req, res) {
@@ -104,7 +106,7 @@ async function purchase (req, res) {
 
           res.json({ url: session.url })
         } else {
-          res.status(500).send({ errors: 'Tickets Not available', success: false, message: 'Available:' + event.data.ticketNb + '/ Needed:' + (data.length + 1) })
+          res.status(500).send({ errors: 'Tickets Not available', success: false, code: 0, message: 'Available:' + event.data.ticketNb + '/ Needed:' + (data.length + 1) })
         }
       }
     }
@@ -114,14 +116,16 @@ async function purchase (req, res) {
   }
 }
 // my local webhook secret key
-const endpointSecret = 'whsec_6d049ad54e2691e2c017292b92c2e40714d0965786b60f580c6105fb369e5ac9'
+const endpointSecret = 'whsec_omD0hpYVYzyogWjK4vVQXKGLJ9T9Yn90'
 
 // a webhook for the payment intents to save infos to the database
 async function webhook (req, res) {
-  const payload = req.body
+  console.log('req', req)
+  console.log('signature', req.rawHeaders[13])
 
+  const payload = req.body
+  console.log('payload', payload.data)
   const sig = req.headers['stripe-signature']
-  console.log(sig)
   let event
   try {
     // check if event coming from stripe by signature
@@ -262,15 +266,29 @@ async function getPurchasesByClient (req, res) {
       where: {
         idClient: idClient
       },
-      include: MultipleTicket,
-      raw: true
+      include: MultipleTicket
     })
     for (let i = 0; i < response.length; i++) {
       try {
         const event = await getEventById(response[i].idEvent)
-        response[i].event = event.data
+        response[i].setDataValue('event', event)
+        console.log(event)
+        for (let k = 0; k < response[i].MultipleTickets.length; k++) {
+          try {
+            console.log(response[i].MultipleTickets.length)
+            console.log('idticket', response[i].MultipleTickets[k].idTicket)
+            const qrCode = await ticketController.GetQrCode(response[i].MultipleTickets[k].idTicket)
+            console.log('qrcode: ', qrCode.data)
+            response[i].MultipleTickets[k].setDataValue('qrCode', qrCode.data)
+          } catch (error) {
+            return res.status(500).json({
+              errors: [error],
+              success: false,
+              message: 'Error getting qrCode'
+            })
+          }
+        }
       } catch (error) {
-        console.log(i, response[i].idClient)
         return res.status(500).json({
           errors: [error],
           success: false,
@@ -287,23 +305,29 @@ async function getPurchasesByClient (req, res) {
     })
   }
 }
-
 async function getAllPurchases (req, res) {
+  const { page, size } = req.query
+  const { limit, offset } = getPagination(page, size)
   try {
-    const response = await Purchase.findAll({
+    const response2 = await Purchase.findAndCountAll({
       include: MultipleTicket,
       // group: ['idClient'],
-      raw: true
+
+      limit,
+      offset,
+      order: [
+        ['createdAt', 'desc']
+      ]
     })
-    console.log(response[0])
-    for (let i = 0; i < response.length; i++) {
+    const response = getPagingData(response2, page, limit)
+    for (let i = 0; i < response.achats.length; i++) {
       try {
-        const event = await getEventById(response[i].idEvent)
-        response[i].event = event.data
-        const client = await getClientById(response[i].idClient, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im4uZ3JlYmljaUBlc2ktc2JhLmR6IiwiaWF0IjoxNjUzMzA3NTcwLCJleHAiOjE2NTU4OTk1NzB9.g2jPPMWpI2nrPLNIffgTSnkFccJrJQ4NwYZaBC55tA4')
-        response[i].client = client.data
+        const event = await getEventById(response.achats[i].idEvent)
+        response.achats[i].setDataValue('event', event.data) 
+        const client = await getClientById(response.achats[i].idClient, req.headers['x-access-token'])
+        response.achats[i].setDataValue('client', client.data)
       } catch (error) {
-        console.log(i, response[i].idClient)
+        console.log(error)
         return res.status(500).json({
           errors: [error],
           success: false,
@@ -320,7 +344,17 @@ async function getAllPurchases (req, res) {
     })
   }
 }
-
+const getPagingData = (data, page, limit) => {
+  const { count: totalItems, rows: achats } = data
+  const currentPage = page ? +page : 0
+  const totalPages = Math.ceil(totalItems / limit)
+  return { totalItems, achats, totalPages, currentPage }
+}
+const getPagination = (page, size) => {
+  const limit = size ? +size : 5
+  const offset = page ? page * limit : 0
+  return { limit, offset }
+}
 async function getSavedEvents (req, res) {
   try {
     const Saved = []
