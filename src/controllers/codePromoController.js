@@ -4,6 +4,7 @@ const { Op } = require('sequelize')
 const { getAdminByToken } = require('../utils/communication')
 async function addCodePromo (req, res) {
   const errors = validationResult(req)
+  console.log(errors)
   if (!errors.isEmpty()) {
     return res.status(422).json({
       errors: errors.array(),
@@ -88,8 +89,16 @@ async function patchCodePromo (req, res) {
   })
 }
 async function getCodePromo (req, res) {
-  CodePromo.findAll().then((codes) => {
-    return res.status(200).send({ data: codes, success: true, message: 'code promos' })
+  const { page, size } = req.query
+  const { limit, offset } = getPagination(page, size)
+  CodePromo.findAndCountAll({
+    offset: offset,
+    limit: limit
+  }).then((codes) => {
+    const response = getPagingData(codes, page, limit)
+    return res
+      .status(200)
+      .send({ data: response, success: true, message: 'code promos' })
   })
 }
 async function checkCodePromo (req, res) {
