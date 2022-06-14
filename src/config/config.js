@@ -6,7 +6,7 @@ module.exports = {
     // dialect: 'mysql',
     // host: 'tiki.mysql.database.azure.com',
     // port: 3306
-    database: 'db',
+    database: 'db_payment',
     user: 'root',
     password: 'root',
     dialect: 'mysql',
