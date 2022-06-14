@@ -1,7 +1,7 @@
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config()
 }
-// const { sequelize } = require('./models')
+const { sequelize } = require('./models')
 const rabbitMq = require('./utils')
 const indexRouter = require('./routes/index')
 const StripePublicKey = process.env.STRIPE_SECRET_KEY
@@ -24,8 +24,8 @@ app.use('/api', indexRouter)
 rabbitMq.CreatChannel()
 eurekaHelper.registerWithEureka('service-purchase', process.env.PORT)
 app.listen(process.env.PORT)
-// sequelize.query('SET FOREIGN_KEY_CHECKS = 0').then(function () {
-//   sequelize.sync({ alter: true })
-// })
+sequelize.query('SET FOREIGN_KEY_CHECKS = 0').then(function () {
+  sequelize.sync({ alter: true })
+})
 module.exports = app
 console.log('server start on port 5003')
