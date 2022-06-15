@@ -23,6 +23,8 @@ async function purchase (req, res) {
     // check client Token
     const token = req.headers['x-access-token']
     const response = await checkTokenClient(token)
+    console.log(response)
+    response.data.client.User.profilePicture = undefined
     if (response.success) {
       console.log('idClient:' + response.data.client.idClient)
       // check for the event if exist

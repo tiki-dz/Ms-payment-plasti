@@ -18,6 +18,7 @@ async function addCodePromo (req, res) {
       .status(500)
       .send({ success: false, message: 'code promos failed' })
   }
+  console.log(adminObject)
   CodePromo.findOrCreate({
     where: {
       name: req.body.name
