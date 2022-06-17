@@ -1,9 +1,7 @@
 const { getEventById } = require('../utils/communication')
 const { default: axios } = require('axios')
-
 const { MultipleTicket, Purchase } = require('../models')
 const jwt = require('jsonwebtoken')
-
 async function getQrCode (req, res) {
   const id = req.params.id
   console.log('req', req)
@@ -57,7 +55,14 @@ async function checkQrCode (req, res) {
         console.log(ticket)
         const event = await getEventById(ticket.Purchase.idEvent)
         if (event.data.name === decoded.ticket.eventName) {
-          const infos = { lastName: ticket.lastName, firstName: ticket.firstName, eventName: event.data.name, time: ticket.createdAt }
+          console.log(event)
+          const infos = {
+            lastName: ticket.lastName,
+            firstName: ticket.firstName,
+            eventName: event.data.name,
+            time: ticket.createdAt,
+            event: event.data
+          }
           return res.status(200).json({ data: infos, success: true, message: 'success' })
         }
         res.status(404).json({ data: { found: decoded.ticket.eventName, original: event.data.name }, success: false, message: ['event name mismatch'] })

@@ -7,8 +7,8 @@ const rabbitMq = require('../utils')
 async function update (req, res) {
   try {
     // TODO can be more dynamic here
-    const dateFrom = new Date(new Date().setDate(new Date().getDate() - 31))
-    const dateTo = new Date(new Date().setDate(new Date().getDate() - 30))
+    const dateFrom = new Date(new Date().setDate(new Date().getDate() - 2))
+    const dateTo = new Date(new Date().setDate(new Date().getDate()))
     console.log(dateFrom)
     const data = await Purchase.findAll({
       where: {
@@ -44,6 +44,7 @@ async function update (req, res) {
     console.log('published new event')
     return res.status(200).send({ success: true, message: 'success' })
   } catch (error) {
+    console.log(error)
     return res.status(500).send({ error: error, success: false, message: 'processing err' })
   }
 }

@@ -35,12 +35,7 @@ async function purchase (req, res) {
         const codePromo = req.body.codePromo
         if (event.data.ticketNb >= data.length + 1) {
           // update the number of available tickets
-          const body = {
-            sub: true,
-            number: data.length + 1
-          }
-          const eventEdited = await editEventById({ id: req.body.event.id, body: body })
-          console.log(eventEdited)
+        
           let neweventprice = event.data.price
           if ('codePromo' in req.body) {
             console.log(new Date())
@@ -100,11 +95,10 @@ async function purchase (req, res) {
             line_items: lineItemsArray,
             // sending the infos in the metadata attribute
             metadata: { infos: JSON.stringify(req.body), client: JSON.stringify(response.data.client), token: token },
-            success_url: 'http://127.0.0.1:8090/home',
+            success_url: 'http://127.0.0.1:8091',
             cancel_url: 'http://127.0.0.1:8090/home/EventList',
             expires_at: Math.floor(Date.now() / 1000 + 3600)
           })
-
           res.json({ url: session.url })
         } else {
           res.status(500).send({ errors: 'Tickets Not available', success: false, code: 0, message: 'Available:' + event.data.ticketNb + '/ Needed:' + (data.length + 1) })
@@ -154,6 +148,17 @@ async function webhook (req, res) {
       const purchaseResponse = await Purchase.create({
         nbTickets: data.data.length + 1, idEvent: parseInt(data.event.id), idClient: parseInt(JSON.parse(session.metadata.client).idClient), CodePromoIdCodePromo: codeP
       })
+
+      const body = {
+        sub: true,
+        number: data.data.length + 1
+      }
+      const eventEdited = await editEventById({
+        id: data.event.id,
+        body: body
+      })
+      console.log(eventEdited)
+
       // here we should remove number of ticket from available
       //  console.log(purchaseResponse)
       console.log(data.data.length, clientInfos)

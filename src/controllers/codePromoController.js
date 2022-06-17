@@ -13,6 +13,7 @@ async function addCodePromo (req, res) {
     })
   }
   const adminObject = await getAdminByToken(req.headers['x-access-token'])
+  console.log(adminObject)
   if (!adminObject) {
     return res
       .status(500)
@@ -25,7 +26,7 @@ async function addCodePromo (req, res) {
     defaults: {
       name: req.body.name,
       use: req.body.use,
-      idAdmin: adminObject.data.Administrator.idAdmin,
+      idAdmin: adminObject.data.Administrator.idAdministrator,
       value: req.body.value,
       startTime: req.body.startTime,
       endTime: req.body.endTime
@@ -89,11 +90,14 @@ async function patchCodePromo (req, res) {
   })
 }
 async function getCodePromo (req, res) {
-  const { page, size } = req.query
+  const { page, size, name } = req.query
   const { limit, offset } = getPagination(page, size)
   CodePromo.findAndCountAll({
     offset: offset,
-    limit: limit
+    limit: limit,
+    where: {
+      name: { [Op.like]: `%${name}%` }
+    }
   }).then((codes) => {
     const response = getPagingData(codes, page, limit)
     return res

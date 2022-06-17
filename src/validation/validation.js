@@ -4,7 +4,7 @@ exports.validate = (method) => {
   switch (method) {
     case 'addCodePromo': {
       return [
-        body('name', 'Invalid value min length 1').isLength({ min: 1, max: 10 }),
+        body('name', 'min1 ').isLength({ min: 1 }),
         body('value').isInt({ min: 1, max: 99 }),
         body('startTime').isISO8601().toDate(),
         body('endTime').isISO8601().toDate()
@@ -14,7 +14,7 @@ exports.validate = (method) => {
     case 'patchCodePromo': {
       return [
         param('id').isInt(),
-        body('name', 'Invalid value min length 1').optional().isLength({ min: 1 }),
+        body('name', 'Invalid value min length 1').isLength({ min: 1 }),
         body('value').optional().isInt(),
         body('startTime').optional().isISO8601().toDate(),
         body('endTime').optional().isISO8601().toDate()
